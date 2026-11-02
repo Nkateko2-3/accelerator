@@ -120,7 +120,7 @@ resource "aws_autoscaling_group" "ecs" {
   }
 }
 
-# 6. Link the cluster to the ASG. The service will ask this provider for a seat.
+# 6. Link the cluster to the ASG. The service will ask this for a seat.
 
 resource "aws_ecs_capacity_provider" "this" {
   name = "${var.project}-cp"

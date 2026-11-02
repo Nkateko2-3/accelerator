@@ -47,3 +47,67 @@ module "ecs_service" {
   # Wait until the capacity provider is attached to the cluster.
   depends_on = [module.ecs_cluster]
 }
+
+# Root — calls only. Workflow 08 applies the five app modules plus the pipeline.
+
+locals {
+  project = var.project
+  region  = var.aws_region
+}
+
+module "vpc" {
+  source  = "./modules/vpc"
+  project = local.project
+}
+
+module "ecr" {
+  source  = "./modules/ecr"
+  project = local.project
+}
+
+module "ecs_cluster" {
+  source = "./modules/ecs-cluster"
+
+  project            = local.project
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+}
+
+module "alb" {
+  source = "./modules/alb"
+
+  project           = local.project
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+}
+
+module "ecs_service" {
+  source = "./modules/ecs-service"
+
+  project                = local.project
+  vpc_id                 = module.vpc.vpc_id
+  private_subnet_ids     = module.vpc.private_subnet_ids
+  cluster_arn            = module.ecs_cluster.cluster_arn
+  capacity_provider_name = module.ecs_cluster.capacity_provider_name
+  image_uri              = "${module.ecr.repository_url}:latest"
+
+  target_group_arn      = module.alb.target_group_arn
+  alb_security_group_id = module.alb.alb_security_group_id
+
+  # Wait until the capacity provider is attached to the cluster.
+  depends_on = [module.ecs_cluster]
+}
+
+module "cicd" {
+  source = "./modules/cicd"
+
+  project                 = local.project
+  aws_region              = local.region
+  codestar_connection_arn = var.codestar_connection_arn
+  github_repository       = var.github_repository
+  github_branch           = var.github_branch
+  ecr_repository_url      = module.ecr.repository_url
+  ecr_repository_name     = module.ecr.repository_name
+  ecs_cluster_name        = module.ecs_cluster.cluster_name
+  ecs_service_name        = module.ecs_service.service_name
+}
